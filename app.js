@@ -17,8 +17,11 @@ var express     = require("express"),
 var commentRoutes    = require("./routes/comments"),
     campgroundRoutes = require("./routes/campgrounds"),
     indexRoutes      = require("./routes/index");
-    
-mongoose.connect("mongodb+srv://frankchen850124:6ULvMg4KyuiiVfSd@cluster0-qwxo2.mongodb.net/test?retryWrites=true", { useNewUrlParser: true});
+
+mongoose.connect(process.env.DATABASEURL, { useNewUrlParser: true });   
+// mongoose.connect("mongodb+srv://frankchen850124:6ULvMg4KyuiiVfSd@cluster0-qwxo2.mongodb.net/test?retryWrites=true", { useNewUrlParser: true});
+
+
 app.set("view engine", "ejs");
 app.use(express.static(__dirname + "/public"));
 app.use(methodOverride("_method"));
