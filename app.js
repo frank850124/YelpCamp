@@ -18,12 +18,7 @@ var commentRoutes    = require("./routes/comments"),
     campgroundRoutes = require("./routes/campgrounds"),
     indexRoutes      = require("./routes/index");
     
-mongoose.connect("mongodb+srv://frankchen850124:<password>@cluster0-qwxo2.mongodb.net/test?retryWrites=true", { 
-  useNewUrlParser: true,
-  uri_decode_auth: true
-}, function (err, db) {
-  db.close();
-});
+mongoose.connect("mongodb+srv://frankchen850124:<password>@cluster0-qwxo2.mongodb.net/test?retryWrites=true", { useNewUrlParser: true});
 app.set("view engine", "ejs");
 app.use(express.static(__dirname + "/public"));
 app.use(methodOverride("_method"));
