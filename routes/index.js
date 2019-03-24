@@ -64,9 +64,9 @@ router.get("/logout", function(req, res){
    res.redirect("/campgrounds");
 });
 
-//forgot password
-router.get("/forgot", function(req, res) {
-   res.render("forgot"); 
+// forgot password
+router.get('/forgot', function(req, res) {
+  res.render('forgot');
 });
 
 router.post('/forgot', function(req, res, next) {
@@ -96,13 +96,13 @@ router.post('/forgot', function(req, res, next) {
       var smtpTransport = nodemailer.createTransport({
         service: 'Gmail', 
         auth: {
-          user: 'frankchen850124@gmail.com',
+          user: 'learntocodeinfo@gmail.com',
           pass: process.env.GMAILPW
         }
       });
       var mailOptions = {
         to: user.email,
-        from: 'frankchen850124@gmail.com',
+        from: 'learntocodeinfo@gmail.com',
         subject: 'Node.js Password Reset',
         text: 'You are receiving this because you (or someone else) have requested the reset of the password for your account.\n\n' +
           'Please click on the following link, or paste this into your browser to complete the process:\n\n' +
