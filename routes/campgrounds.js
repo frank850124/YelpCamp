@@ -5,6 +5,27 @@ var Comment = require("../models/comment");
 var Review = require("../models/review");
 var middleware = require("../middleware");
 var NodeGeocoder = require('node-geocoder');
+var multer = require('multer');
+var storage = multer.diskStorage({
+  filename: function(req, file, callback) {
+    callback(null, Date.now() + file.originalname);
+  }
+});
+var imageFilter = function (req, file, cb) {
+    // accept image files only
+    if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/i)) {
+        return cb(new Error('Only image files are allowed!'), false);
+    }
+    cb(null, true);
+};
+var upload = multer({ storage: storage, fileFilter: imageFilter});
+
+var cloudinary = require('cloudinary');
+cloudinary.config({ 
+  cloud_name: 'dbiwboq5k', 
+  api_key: process.env.CLOUDINARY_API_KEY, 
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
  
 var options = {
   provider: 'google',
@@ -44,36 +65,41 @@ router.get("/", function(req, res){
 });
 
 //CREATE - add new campground to DB
-router.post("/", middleware.isLoggedIn, function(req, res){
-  // get data from form and add to campgrounds array
-  var name = req.body.name;
-  var image = req.body.image;
-  var price =req.body.price;
-  var desc = req.body.description;
-  var author = {
-      id: req.user._id,
-      username: req.user.username
-  };
-  geocoder.geocode(req.body.location, function (err, data) {
-    if (err || !data.length) {
-      req.flash('error', 'Invalid address');
-      return res.redirect('back');
-    }
-    var lat = data[0].latitude;
-    var lng = data[0].longitude;
-    var location = data[0].formattedAddress;
-    var newCampground = {name: name, image: image, price: price, description: desc, author:author, location: location, lat: lat, lng: lng};
-    // Create a new campground and save to DB
-    Campground.create(newCampground, function(err, newlyCreated){
-        if(err){
-            console.log(err);
-        } else {
-            //redirect back to campgrounds page
-            console.log(newlyCreated);
-            res.redirect("/campgrounds");
+
+router.post("/", middleware.isLoggedIn, upload.single('image'), function(req, res) {
+    cloudinary.v2.uploader.upload(req.file.path, function(err, result) {
+      if(err) {
+        req.flash('error', err.message);
+        return res.redirect('back');
+      }
+      geocoder.geocode(req.body.location, function (err, data) {
+        if (err || !data.length) {
+          req.flash('error', 'Invalid address');
+          return res.redirect('back');
         }
+            req.body.campground.lat = data[0].latitude;
+            req.body.campground.lng = data[0].longitude;
+            req.body.campground.location = data[0].formattedAddress;
+        
+            // add cloudinary url for the image to the campground object under image property
+            req.body.campground.image = result.secure_url;
+            // add image's public_id to campground object
+            req.body.campground.imageId = result.public_id;
+            // add author to campground
+            req.body.campground.author = {
+              id: req.user._id,
+              username: req.user.username
+            };
+          Campground.create(req.body.campground, function(err, campground) {
+            if (err) {
+              req.flash('error', err.message);
+              return res.redirect('back');
+            }
+            res.redirect('/campgrounds/' + campground.id);
+          });
+      });
+      
     });
-  });
 });
 
 //NEW - show form to create new campground
@@ -106,34 +132,54 @@ router.get("/:id/edit", middleware.checkCampgroundOwnership, function(req, res) 
     });
 });
 
-// UPDATE CAMPGROUND ROUTE
-router.put("/:id", middleware.checkCampgroundOwnership, function(req, res){
-  geocoder.geocode(req.body.location, function (err, data) {
-    if (err || !data.length) {
-      req.flash('error', 'Invalid address');
-      return res.redirect('back');
-    }
-    req.body.campground.lat = data[0].latitude;
-    req.body.campground.lng = data[0].longitude;
-    req.body.campground.location = data[0].formattedAddress;
-
-    Campground.findByIdAndUpdate(req.params.id, req.body.campground, function(err, campground){
+//UPDATE CAMPGROUND ROUTE
+router.put("/:id", middleware.checkCampgroundOwnership, upload.single('image'), (req, res) => {
+    Campground.findById(req.params.id, async (err, campground) => { // finds the camp
         if(err){
+            console.log(err);
             req.flash("error", err.message);
             res.redirect("back");
         } else {
-            req.flash("success","Successfully Updated!");
+            if (req.file) { //the logic below will fire up only if the user is uploading an image file while editing a camp
+                try {
+                    await cloudinary.v2.uploader.destroy(campground.imageId);
+                    let result = await cloudinary.v2.uploader.upload(req.file.path);
+                    campground.imageId = result.public_id;
+                    campground.image = result.secure_url;
+                } catch(err) {
+                    req.flash("error", err.message);
+                    return res.redirect("back");
+                }
+            }
+//geocoder logic below will always check the "location" field in the edit form,  "prettyfy" the address and get the geo coordinates 
+            geocoder.geocode(req.body.campground.location, (err, data) => { //assuming that your new.ejs campground form is using the following format: name="campground[location]"; otherwise use req.body.location
+                if(err || !data.length) {
+                    console.log(err);
+                    req.flash('error', 'Invalid address');
+                    return res.redirect('back');
+                }//end of geocoder logic
+//update the camp object and save the changes to the DB
+            campground.lat = data[0].latitude;
+            campground.lng = data[0].longitude;
+            campground.location = data[0].formattedAddress;
+            campground.name = req.body.campground.name; //assuming that your new.ejs campground form is using the following format: name="campground[name]" etc;
+            campground.description = req.body.campground.description; //idem
+            campground.price = req.body.campground.price; //idem; if you didn't add this functionality yet, just delete this line
+            campground.save();
+            req.flash("success", "Successfully Updated!");
             res.redirect("/campgrounds/" + campground._id);
+            });
         }
     });
-  });
 });
+ 
 
 // DESTROY CAMPGROUND ROUTE
-router.delete("/:id", middleware.checkCampgroundOwnership, function (req, res) {
+router.delete("/:id", middleware.checkCampgroundOwnership, async function (req, res) {
     Campground.findById(req.params.id, function (err, campground) {
         if (err) {
-            res.redirect("/campgrounds");
+             req.flash("error", err.message);
+             return res.redirect("back");
         } else {
             // deletes all comments associated with the campground
             Comment.remove({"_id": {$in: campground.comments}}, function (err) {
