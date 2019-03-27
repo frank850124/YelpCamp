@@ -82,7 +82,7 @@ router.post("/", middleware.isLoggedIn, upload.single('image'), function(req, re
             req.body.campground.location = data[0].formattedAddress;
         
             // add cloudinary url for the image to the campground object under image property
-            req.body.campground.image = req.body.image;
+            req.body.campground.image = result.secure_url;
             // add image's public_id to campground object
             req.body.campground.imageId = result.public_id;
             // add author to campground
