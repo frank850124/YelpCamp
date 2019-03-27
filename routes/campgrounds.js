@@ -74,6 +74,7 @@ router.post("/", middleware.isLoggedIn, upload.single('image'), function(req, re
       }
       geocoder.geocode(req.body.location, function (err, data) {
         if (err || !data.length) {
+          console.log(err);
           req.flash('error', 'Invalid address');
           return res.redirect('back');
         }
@@ -101,6 +102,7 @@ router.post("/", middleware.isLoggedIn, upload.single('image'), function(req, re
       
     });
 });
+
 
 //NEW - show form to create new campground
 router.get("/new", middleware.isLoggedIn, function(req, res){
